@@ -30,7 +30,7 @@
 
 #include "sensirion_common.h"
 #include "sgp_git_version.h"
-#include "sgp30.h"
+#include "sgpc3.h"
 #include "sht.h"
 
 #define T_LO (-20000)
@@ -39,11 +39,6 @@ static const u32 AH_LUT_100RH[] = {
     1078, 2364, 4849, 9383, 17243, 30264, 50983, 82785, 130048, 198277
 };
 static const u32 T_STEP = (T_HI - T_LO) / (ARRAY_SIZE(AH_LUT_100RH) - 1);
-
-static void svm_compensate_rht(s32 *temperature, s32 *humidity) {
-    *temperature = ((*temperature * 8225) >> 13) - 500;
-    *humidity = (*humidity * 8397) >> 13;
-}
 
 /**
  * Convert relative humidity [%RH*1000] and temperature [mC] to
@@ -84,56 +79,19 @@ const char *svm_get_driver_version()
 }
 
 /**
- * svm_measure_iaq_blocking_read() - Measure IAQ concentrations tVOC, CO2-Eq.
- *
- * @tvoc_ppb:   The tVOC ppb value will be written to this location
- * @co2_eq_ppm: The CO2-Equivalent ppm value will be written to this location
- *
- * The profile is executed synchronously.
- *
- * Return:      STATUS_OK on success, else STATUS_FAIL
- */
-s16 svm_measure_iaq_blocking_read(u16 *tvoc_ppb, u16 *co2_eq_ppm,
-                                  s32 *temperature, s32 *humidity) {
-    u32 absolute_humidity;
-    u16 sgp_feature_set;
-    u8 sgp_product_type;
-    s16 err;
-
-    err = sht_measure_blocking_read(temperature, humidity);
-    if (err != STATUS_OK)
-        return err;
-
-    sgp_get_feature_set_version(&sgp_feature_set, &sgp_product_type);
-    if (sgp_feature_set >= 0x20) {
-        absolute_humidity = sensirion_calc_absolute_humidity(temperature, humidity);
-        sgp_set_absolute_humidity(absolute_humidity);
-    }
-
-    svm_compensate_rht(temperature, humidity);
-
-    err = sgp_measure_iaq_blocking_read(tvoc_ppb, co2_eq_ppm);
-    if (err != STATUS_OK)
-        return err;
-
-    return STATUS_OK;
-}
-
-/**
- * svm_measure_signals_blocking_read() - Measure signals
+ * svm_measure_iaq_blocking_read() - Measure IAQ concentration tVOC
  *
  * The output values are written to the memory locations passed as parameters:
- * @ethanol_signal: The ethanol signal
- * @h2_signal:      The h2 signal
- * @temperature:    Temperature in [degree Celsius] multiplied by 1000
+ * @tvoc_ppb:   The tVOC value in [ppb]
+ * @temperature: Temperature in [degree Celsius] multiplied by 1000
  * @humidity:   Relative humidity in [%RH (0..100)] multiplied by 1000
  *
  * The profile is executed synchronously.
  *
  * Return:      STATUS_OK on success, else STATUS_FAIL
  */
-s16 svm_measure_signals_blocking_read(u16 *ethanol_signal, u16 *h2_signal,
-                                      s32 *temperature, s32 *humidity) {
+s16 svm_measure_iaq_blocking_read(u16 *tvoc_ppb,
+                                  s32 *temperature, s32 *humidity) {
     u32 absolute_humidity;
     u16 sgp_feature_set;
     u8 sgp_product_type;
@@ -149,7 +107,7 @@ s16 svm_measure_signals_blocking_read(u16 *ethanol_signal, u16 *h2_signal,
         sgp_set_absolute_humidity(absolute_humidity);
     }
 
-    err = sgp_measure_signals_blocking_read(ethanol_signal, h2_signal);
+    err = sgp_measure_iaq_blocking_read(tvoc_ppb);
     if (err != STATUS_OK)
         return err;
 
@@ -157,9 +115,9 @@ s16 svm_measure_signals_blocking_read(u16 *ethanol_signal, u16 *h2_signal,
 }
 
 /**
- * svm_probe() - check if an SVM30 module is available and initialize it
+ * svm_probe() - check if an SGP and an SHT are available and initializes them
  *
- * This call aleady initializes the IAQ baselines (sgp_iaq_init())
+ * This call aleady initializes the IAQ baseline (sgp_iaq_init())
  *
  * Return:  STATUS_OK on success.
  */
