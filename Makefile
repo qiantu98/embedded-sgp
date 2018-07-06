@@ -51,7 +51,28 @@ release/svm30: release/sgp30
 	cd release && zip -r "$${pkgname}.zip" "$${pkgname}" && cd - && \
 	ln -sf $${pkgname} $@
 
-release: clean $(release_drivers)
+release/sgpc3-shtc1-combo-driver: release/sgpc3
+	export rel=$@ && \
+	export sht_driver=../embedded-sht/release/shtc1 && \
+	export sgp_driver=./release/sgpc3 && \
+	export driver=svm30 && \
+	export tag="$$(git describe --always --dirty)" && \
+	export pkgname="sgpc3-shtc1-combo-driver-$${tag}" && \
+	export pkgdir="release/$${pkgname}" && \
+	rm -rf "$${pkgdir}" && mkdir -p "$${pkgdir}" && \
+	cp -r $${sht_driver}/* "$${pkgdir}" && \
+	cp -r $${sgp_driver}/* "$${pkgdir}" && \
+	cp -r $${driver}/* "$${pkgdir}" && \
+	perl -pi -e 's/^sensirion_common_dir :=.*$$/sensirion_common_dir := ./' "$${pkgdir}/Makefile" && \
+	perl -pi -e 's/^sgp_common_dir :=.*$$/sgp_common_dir := ./' "$${pkgdir}/Makefile" && \
+	perl -pi -e 's/^sgp_source_dir :=.*$$/sgp_source_dir := ./' "$${pkgdir}/Makefile" && \
+	perl -pi -e 's/^sht_common_dir :=.*$$/sht_common_dir := ./' "$${pkgdir}/Makefile" && \
+	perl -pi -e 's/^sht_source_dir :=.*$$/sht_source_dir := ./' "$${pkgdir}/Makefile" && \
+	cd "$${pkgdir}" && $(MAKE) $(MFLAGS) && $(MAKE) clean $(MFLAGS) && cd - && \
+	cd release && zip -r "$${pkgname}.zip" "$${pkgname}" && cd - && \
+	ln -sf $${pkgname} $@
+
+release: clean $(release_drivers) release/sgpc3-shtc1-combo-driver
 
 $(clean_drivers):
 	export rel=$@ && \
